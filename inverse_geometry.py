@@ -15,12 +15,34 @@ from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 
 from tools import setcubeplacement
 
+from scipy.optimize import fmin_bfgs, fmin_slsqp
+
+
 def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
     '''Return a collision free configuration grasping a cube at a specific location and a success flag'''
     setcubeplacement(robot, cube, cubetarget)
-    #TODO implement
-    print ("TODO: implement me")
-    return robot.q0, False
+    
+    def cost(q):
+        pin.framesForwardKinematics(robot.model,robot.data,q)
+        pin.computeJointJacobians(robot.model, robot.data, q)
+        # get placement of LEFT_HAND and RIGHT_HAND
+        oMleft_hand = robot.data.oMf[robot.model.getFrameId(LEFT_HAND)]
+        oMright_hand = robot.data.oMf[robot.model.getFrameId(RIGHT_HAND)]
+        
+        # get placement of LEFT_HOOK and RIGHT_HOOK
+        oMleft_hook = getcubeplacement(cube, LEFT_HOOK)
+        oMright_hook = getcubeplacement(cube, RIGHT_HOOK)
+        
+        return norm(pin.log(oMleft_hand.inverse() * oMleft_hook).vector) + \
+                + norm(pin.log(oMright_hand.inverse() * oMright_hook).vector)
+    
+    def callback(q):
+        pass
+    
+    qtarget = fmin_bfgs(cost, qcurrent, callback=callback)
+    
+    return qtarget, True
+
             
 if __name__ == "__main__":
     from tools import setupwithmeshcat
@@ -29,10 +51,7 @@ if __name__ == "__main__":
     
     q = robot.q0.copy()
     
-    q0,successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
-    qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
+    q0, successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
+    qe, successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
     
     updatevisuals(viz, robot, cube, q0)
-    
-    
-    
