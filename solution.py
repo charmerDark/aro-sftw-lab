@@ -13,5 +13,5 @@ from pinocchio.utils import rotate
 
 #helpers 
 #if needed, you can store the placement of the right hand in the left hand frame here
-LMRREF = pin.SE3(pin.Quaternion(-0 ,0, 0, 1 ), np.array(np.array([0, 0, 0])))
+LMRREF = pin.SE3(pin.Quaternion(0. ,0., 0., 1.), np.array([0., -0.1, 0.]))
 RMLREF = LMRREF.inverse()
