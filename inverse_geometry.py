@@ -23,6 +23,7 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
     setcubeplacement(robot, cube, cubetarget)
     
     def cost(q):
+        q = projecttojointlimits(robot, q)
         pin.framesForwardKinematics(robot.model,robot.data,q)
         pin.computeJointJacobians(robot.model, robot.data, q)
         # get placement of LEFT_HAND and RIGHT_HAND
@@ -33,11 +34,18 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
         oMleft_hook = getcubeplacement(cube, LEFT_HOOK)
         oMright_hook = getcubeplacement(cube, RIGHT_HOOK)
         
-        return norm(pin.log(oMleft_hand.inverse() * oMleft_hook).vector) + \
-                + norm(pin.log(oMright_hand.inverse() * oMright_hook).vector)
+        norm_diff = norm(pin.log(oMleft_hand.inverse() * oMleft_hook).vector) + \
+                    norm(pin.log(oMright_hand.inverse() * oMright_hook).vector)
+        
+        joint_cost = jointlimitscost(robot, q)
+        collision_cost = 100000 if collision(robot, q) else 0
+        
+        return norm_diff + joint_cost + collision_cost
     
     def callback(q):
-        pass
+        q = projecttojointlimits(robot, q)
+        if collision(robot, q):
+            pass
     
     qtarget = fmin_bfgs(cost, qcurrent, callback=callback)
     
