@@ -9,6 +9,8 @@ Created on Wed Sep  6 15:32:51 2023
 import pinocchio as pin #the pinocchio library
 import numpy as np
 
+COLLI_COST = 100000
+
 def jointlimitscost(robot,q):
     up = max(q - robot.model.upperPositionLimit)
     down = max(robot.model.lowerPositionLimit - q)
