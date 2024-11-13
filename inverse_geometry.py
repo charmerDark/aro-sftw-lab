@@ -13,7 +13,8 @@ from tools import collision, getcubeplacement, setcubeplacement, projecttojointl
 from config import LEFT_HOOK, RIGHT_HOOK, LEFT_HAND, RIGHT_HAND, EPSILON
 from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 
-from tools import setcubeplacement
+from tools import setcubeplacement, collision, jointlimitsviolated
+
 
 def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
     """
@@ -22,24 +23,10 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
     setcubeplacement(robot, cube, cubetarget)
     q = qcurrent.copy()
     DT = 1e-2
-    tol = 1e-3
-    
-    
     pin.framesForwardKinematics(robot.model,robot.data,q)
-    pin.computeJointJacobians(robot.model,robot.data,q)
-    oMcubeL = getcubeplacement(cube, LEFT_HOOK)
-    oMcubeR = getcubeplacement(cube, RIGHT_HOOK)
-    
-    oMrarm = robot.data.oMf[robot.model.getFrameId(RIGHT_HAND)]
-    oMlarm = robot.data.oMf[robot.model.getFrameId(LEFT_HAND)]
-    
-    o_right = pin.log(oMrarm.inverse() * oMcubeR).vector
-    o_left = pin.log(oMlarm.inverse() * oMcubeL).vector
-    
-    net_error = np.sum(o_right + o_left)
 
-    
-    while abs(net_error) > tol:  # check if error within tolerance
+    # Loop on an inverse kinematics for 1000 iterations.
+    for i in range(1000):  # Integrate over 10 second of robot life
 
         pin.framesForwardKinematics(robot.model,robot.data,q)
         pin.computeJointJacobians(robot.model,robot.data,q)
@@ -58,17 +45,15 @@ def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
         o_Jlarm = pin.computeFrameJacobian(robot.model, robot.data, q, robot.model.getFrameId(LEFT_HAND))
         o_left = pin.log(oMlarm.inverse() * oMcubeL).vector
         
-        net_error = np.sum(o_right + o_left)
-        
-        vq =  pinv(o_Jlarm) @ o_left + pinv(o_Jrarm) @ o_right
+        vq =  pinv(o_Jlarm) @ o_left + pinv(o_Jrarm) @ o_right # could do a single vetor packing larm and rarm params
+
         
         q = pin.integrate(robot.model, q, vq * DT)
+    if not (collision(robot, q) or jointlimitsviolated(robot, q)):
+        return q, True
     
-    return q, True
-
-    
-    
-    return robot.q0, False
+    else:
+        return q, False
             
 if __name__ == "__main__":
     from tools import setupwithmeshcat
