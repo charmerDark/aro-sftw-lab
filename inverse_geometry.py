@@ -15,42 +15,60 @@ from config import CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 
 from tools import setcubeplacement
 
-from scipy.optimize import fmin_bfgs, fmin_slsqp
-
-
 def computeqgrasppose(robot, qcurrent, cube, cubetarget, viz=None):
-    '''Return a collision free configuration grasping a cube at a specific location and a success flag'''
+    """
+    Function computes a final position that can match goal. Not path to it
+    """
     setcubeplacement(robot, cube, cubetarget)
+    q = qcurrent.copy()
+    DT = 1e-2
+    tol = 1e-3
     
-    def cost(q):
-        q = projecttojointlimits(robot, q)
-        pin.framesForwardKinematics(robot.model,robot.data,q)
-        pin.computeJointJacobians(robot.model, robot.data, q)
-        # get placement of LEFT_HAND and RIGHT_HAND
-        oMleft_hand = robot.data.oMf[robot.model.getFrameId(LEFT_HAND)]
-        oMright_hand = robot.data.oMf[robot.model.getFrameId(RIGHT_HAND)]
-        
-        # get placement of LEFT_HOOK and RIGHT_HOOK
-        oMleft_hook = getcubeplacement(cube, LEFT_HOOK)
-        oMright_hook = getcubeplacement(cube, RIGHT_HOOK)
-        
-        norm_diff = norm(pin.log(oMleft_hand.inverse() * oMleft_hook).vector) + \
-                    norm(pin.log(oMright_hand.inverse() * oMright_hook).vector)
-        
-        joint_cost = jointlimitscost(robot, q)
-        collision_cost = 100000 if collision(robot, q) else 0
-        
-        return norm_diff + joint_cost + collision_cost
     
-    def callback(q):
-        q = projecttojointlimits(robot, q)
-        if collision(robot, q):
-            pass
+    pin.framesForwardKinematics(robot.model,robot.data,q)
+    pin.computeJointJacobians(robot.model,robot.data,q)
+    oMcubeL = getcubeplacement(cube, LEFT_HOOK)
+    oMcubeR = getcubeplacement(cube, RIGHT_HOOK)
     
-    qtarget = fmin_bfgs(cost, qcurrent, callback=callback)
+    oMrarm = robot.data.oMf[robot.model.getFrameId(RIGHT_HAND)]
+    oMlarm = robot.data.oMf[robot.model.getFrameId(LEFT_HAND)]
     
-    return qtarget, True
+    o_right = pin.log(oMrarm.inverse() * oMcubeR).vector
+    o_left = pin.log(oMlarm.inverse() * oMcubeL).vector
+    
+    net_error = np.sum(o_right + o_left)
 
+    
+    while abs(net_error) > tol:  # check if error within tolerance
+
+        pin.framesForwardKinematics(robot.model,robot.data,q)
+        pin.computeJointJacobians(robot.model,robot.data,q)
+        
+        oMcubeL = getcubeplacement(cube, LEFT_HOOK) 
+        oMcubeR = getcubeplacement(cube, RIGHT_HOOK)
+        
+        #Right hand task
+        oMrarm = robot.data.oMf[robot.model.getFrameId(RIGHT_HAND)]
+        o_Jrarm = pin.computeFrameJacobian(robot.model, robot.data, q, robot.model.getFrameId(RIGHT_HAND))
+        o_right = pin.log(oMrarm.inverse() * oMcubeR).vector
+        
+        
+        #Left hand task
+        oMlarm = robot.data.oMf[robot.model.getFrameId(LEFT_HAND)]
+        o_Jlarm = pin.computeFrameJacobian(robot.model, robot.data, q, robot.model.getFrameId(LEFT_HAND))
+        o_left = pin.log(oMlarm.inverse() * oMcubeL).vector
+        
+        net_error = np.sum(o_right + o_left)
+        
+        vq =  pinv(o_Jlarm) @ o_left + pinv(o_Jrarm) @ o_right
+        
+        q = pin.integrate(robot.model, q, vq * DT)
+    
+    return q, True
+
+    
+    
+    return robot.q0, False
             
 if __name__ == "__main__":
     from tools import setupwithmeshcat
@@ -59,7 +77,10 @@ if __name__ == "__main__":
     
     q = robot.q0.copy()
     
-    q0, successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
-    qe, successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
+    q0,successinit = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT, viz)
+    qe,successend = computeqgrasppose(robot, q, cube, CUBE_PLACEMENT_TARGET,  viz)
     
     updatevisuals(viz, robot, cube, q0)
+    
+    
+    
