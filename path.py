@@ -14,22 +14,18 @@ from numpy.linalg import pinv
 from config import LEFT_HAND, RIGHT_HAND, CUBE_PLACEMENT, CUBE_PLACEMENT_TARGET
 import time
 from inverse_geometry import computeqgrasppose
-from tools import jointlimitsviolated, collision, COLLI_COST, jointlimitscost, projecttojointlimits, setcubeplacement
+from tools import jointlimitsviolated, collision, COLLI_COST, jointlimitscost, projecttojointlimits, setcubeplacement, setupwithmeshcat
 from solution import LMRREF
 
 from scipy.optimize import fmin_bfgs, fmin_slsqp
 from numpy.linalg import pinv,inv,norm,svd,eig
-
-from tools import setupwithmeshcat
-    
-robot, cube, viz = setupwithmeshcat()
 
 discretisationsteps_newconf = 3 # To tweak later on
 discretisationsteps_validedge = 3 # To tweak later on
 k = 1000  # To tweak later on
 delta_q = None # To tweak later on
 
-
+robot, cube, viz = setupwithmeshcat()
 
 def RAND_CONF():
     '''
@@ -45,7 +41,7 @@ def RAND_CONF():
         random_placement = pin.SE3(rotate('z', 0), translation_array)
         setcubeplacement(robot, cube, random_placement)
         if not pin.computeCollisions(cube.collision_model, cube.collision_data, False):
-            random_conf, success = computeqgrasppose(robot, robot.q0, cube, random_placement, disp=False)
+            random_conf, success = computeqgrasppose(robot, robot.q0, cube, random_placement)
             if success:
                 return random_conf
             
@@ -164,7 +160,7 @@ def getpath(G):
         node = G[node[0]]
     path = [G[0][1]] + path
     
-    extend_steps = 10
+    extend_steps = 20
     path_extend = path[0: 1]
     for q0, q1 in zip(path[:-1],path[1:]):
         path_extend += path_qgrasp(q0, q1, extend_steps)[1:]
