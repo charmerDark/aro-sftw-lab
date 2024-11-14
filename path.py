@@ -45,7 +45,7 @@ def RAND_CONF():
         random_placement = pin.SE3(rotate('z', 0), translation_array)
         setcubeplacement(robot, cube, random_placement)
         if not pin.computeCollisions(cube.collision_model, cube.collision_data, False):
-            random_conf, success = computeqgrasppose(robot, robot.q0, cube, random_placement, disp=False)
+            random_conf, success = computeqgrasppose(robot, robot.q0, cube, random_placement, viz = False)
             if success:
                 return random_conf
             
